@@ -1,0 +1,61 @@
+# OS and editor noise
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+secrets/
+
+# Dependency and build outputs
+node_modules/
+vendor/
+dist/
+build/
+out/
+coverage/
+.turbo/
+.next/
+.nuxt/
+.svelte-kit/
+.cache/
+.parcel-cache/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+__pycache__/
+*.py[cod]
+target/
+
+# Logs and local reports
+*.log
+logs/
+reports/
+test-results/
+playwright-report/
+
+# Local agent/session state
+AGENTS.override.md
+CLAUDE.local.md
+.codex-log/
+.codex/sessions/
+.codex/tmp/
+.claude/local/
+.claude/sessions/
+.claude/tmp/
+docs/agent/scratch/
+brain/scratch/
+
+# Tool-specific local preferences
+.mindmux/preferences.json
+.mcp.local.json

@@ -1,0 +1,45 @@
+#!/usr/bin/env sh
+set -eu
+
+fail() {
+  printf '%s\n' "check-brain: $*" >&2
+  exit 1
+}
+
+[ -s BRAIN.md ] || fail "missing BRAIN.md"
+[ -d brain ] || fail "missing brain/"
+[ -d brain/pages ] || fail "missing brain/pages/"
+
+for file in \
+  brain/index.md \
+  brain/background.md \
+  brain/architecture.md \
+  brain/flow.md \
+  brain/mindmap.md \
+  brain/stack.md \
+  brain/roadmap.md
+do
+  [ -s "$file" ] || fail "missing or empty $file"
+done
+
+found_page=false
+for page in brain/pages/*.md; do
+  [ -e "$page" ] || continue
+  found_page=true
+  grep -q '^---$' "$page" || fail "$page missing frontmatter fence"
+  grep -q '^id: ' "$page" || fail "$page missing id"
+  grep -q '^title: ' "$page" || fail "$page missing title"
+  grep -q '^category: ' "$page" || fail "$page missing category"
+  grep -q '^status: ' "$page" || fail "$page missing status"
+  grep -q '^created: ' "$page" || fail "$page missing created"
+  grep -q '^updated: ' "$page" || fail "$page missing updated"
+  grep -q '^## compiled_truth$' "$page" || fail "$page missing compiled_truth"
+  grep -q '^## timeline$' "$page" || fail "$page missing timeline"
+done
+
+[ "$found_page" = true ] || fail "brain/pages must contain at least one page"
+
+grep -q 'scripts/agent/check-brain' BRAIN.md || fail "BRAIN.md must mention check-brain"
+grep -q '\[\[agent-harness-memory\]\]' brain/index.md || fail "brain/index.md must link the sample decision page"
+
+printf '%s\n' "check-brain: ok"

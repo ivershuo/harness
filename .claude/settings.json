@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(scripts/agent/check-agent-instructions)",
+      "Bash(scripts/agent/check-docs)",
+      "Bash(scripts/agent/check-architecture)",
+      "Bash(scripts/agent/check-brain)"
+    ],
+    "deny": [
+      "Bash(rm -rf *)",
+      "Bash(curl * | sh)",
+      "Bash(wget * | sh)"
+    ]
+  },
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "scripts/agent/check-agent-instructions"
+          }
+        ]
+      }
+    ]
+  }
+}

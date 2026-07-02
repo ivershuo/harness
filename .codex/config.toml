@@ -1,0 +1,6 @@
+# Project-scoped Codex configuration.
+# Enable only after the repository is trusted in Codex.
+
+# Add project MCP servers here when needed, for example GitHub, Figma,
+# Playwright, observability, or internal docs.
+

@@ -1,0 +1,14 @@
+#!/usr/bin/env sh
+set -eu
+
+fail() {
+  printf '%s\n' "check-architecture: $*" >&2
+  exit 1
+}
+
+[ -s docs/ARCHITECTURE.md ] || fail "missing docs/ARCHITECTURE.md"
+grep -q '## Boundaries' docs/ARCHITECTURE.md || fail "ARCHITECTURE.md needs Boundaries section"
+grep -q '## Public Interfaces' docs/ARCHITECTURE.md || fail "ARCHITECTURE.md needs Public Interfaces section"
+grep -q '## Change Rules' docs/ARCHITECTURE.md || fail "ARCHITECTURE.md needs Change Rules section"
+
+printf '%s\n' "check-architecture: ok"

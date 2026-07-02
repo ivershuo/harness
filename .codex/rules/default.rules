@@ -1,0 +1,25 @@
+# Codex command policy examples. Review before enabling in a real project.
+
+prefix_rule(
+    pattern = ["scripts/agent/check-agent-instructions"],
+    decision = "allow",
+    justification = "Read-only agent harness hygiene check.",
+)
+
+prefix_rule(
+    pattern = ["scripts/agent/check-docs"],
+    decision = "allow",
+    justification = "Read-only documentation structure check.",
+)
+
+prefix_rule(
+    pattern = ["scripts/agent/check-architecture"],
+    decision = "allow",
+    justification = "Read-only architecture documentation check.",
+)
+
+prefix_rule(
+    pattern = ["scripts/agent/check-brain"],
+    decision = "allow",
+    justification = "Read-only project brain structure check.",
+)

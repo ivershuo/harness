@@ -1,0 +1,32 @@
+#!/usr/bin/env sh
+set -eu
+
+fail() {
+  printf '%s\n' "check-docs: $*" >&2
+  exit 1
+}
+
+for file in \
+  docs/ARCHITECTURE.md \
+  docs/PRODUCT.md \
+  docs/QUALITY.md \
+  docs/SECURITY.md \
+  docs/PERFORMANCE.md \
+  docs/OPERATIONS.md \
+  docs/agent/index.md
+do
+  [ -s "$file" ] || fail "missing or empty $file"
+done
+
+for workflow in feature-plan bug-repro pr-review security-review doc-gardener brain-ingest; do
+  [ -s "docs/agent/workflows/$workflow.md" ] || fail "missing workflow $workflow"
+done
+
+for evaluation in general ui api security; do
+  [ -s "docs/agent/evaluations/$evaluation.md" ] || fail "missing evaluation $evaluation"
+done
+
+grep -q 'Security' docs/QUALITY.md || fail "quality docs should mention security"
+grep -q 'Performance' docs/QUALITY.md || fail "quality docs should mention performance"
+
+printf '%s\n' "check-docs: ok"
