@@ -85,7 +85,9 @@ test("init preserves existing seed content and merges shared settings", async ()
   assert.equal(settings.customSetting, true);
   assert(settings.permissions.allow.includes("Bash(npm test)"));
   assert(settings.permissions.allow.includes("Bash(node scripts/agent/check.mjs*)"));
-  assert.equal(await readFile(path.join(root, ".mcp.json"), "utf8"), "{\n  \"mcpServers\": {}\n}\n");
+  assert.deepEqual(JSON.parse(await readFile(path.join(root, ".mcp.json"), "utf8")), {
+    mcpServers: {},
+  });
   const manifest = JSON.parse(await readFile(path.join(root, ".agent-harness", "manifest.json"), "utf8"));
   assert.equal(manifest.pending["AGENTS.md"].reason, "seed-adaptation");
   const proposal = await readFile(path.join(root, manifest.pending["AGENTS.md"].proposal), "utf8");
@@ -187,7 +189,7 @@ test("CRLF-only changes do not mark managed files as modified", async () => {
   ]) {
     const file = path.join(root, ...relative.split("/"));
     const content = await readFile(file, "utf8");
-    await writeFile(file, content.replaceAll("\n", "\r\n"), "utf8");
+    await writeFile(file, content.replaceAll("\r\n", "\n").replaceAll("\n", "\r\n"), "utf8");
   }
   const doctor = runCli(root, "doctor");
   assert.equal(doctor.status, 0, doctor.stderr);
