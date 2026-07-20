@@ -8,13 +8,19 @@ import { spawnSync } from "node:child_process";
 const root = process.cwd();
 const cache = mkdtempSync(path.join(os.tmpdir(), "agent-harness-npm-cache-"));
 const npm = process.platform === "win32" ? "npm.cmd" : "npm";
+const packArgs = ["pack", "--dry-run", "--json", "--cache", cache];
+const npmExecPath = process.env.npm_execpath;
+const command = npmExecPath ? process.execPath : npm;
+const commandArgs = npmExecPath ? [npmExecPath, ...packArgs] : packArgs;
 
 try {
-  const result = spawnSync(npm, ["pack", "--dry-run", "--json", "--cache", cache], {
+  const result = spawnSync(command, commandArgs, {
     cwd: root,
     encoding: "utf8",
   });
-  if (result.status !== 0) throw new Error(result.stderr || result.stdout || "npm pack failed");
+  if (result.status !== 0) {
+    throw new Error(result.stderr || result.stdout || result.error?.message || "npm pack failed");
+  }
   const report = JSON.parse(result.stdout)[0];
   const packaged = new Map(report.files.map((file) => [file.path, file]));
   const catalog = JSON.parse(readFileSync(path.join(root, "templates", "catalog.json"), "utf8"));
