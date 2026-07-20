@@ -26,3 +26,6 @@ Define project-specific budgets here:
 
 Use the smallest meaningful performance check for a change: benchmark, trace,
 query plan, bundle analyzer, load test, or production metric comparison.
+
+The Harness CLI must remain bounded by the number and size of catalog files. It
+must not scan dependency directories or make runtime network calls.

@@ -47,6 +47,8 @@ playwright-report/
 # Local agent/session state
 AGENTS.override.md
 CLAUDE.local.md
+.agent-harness/proposals/
+.agent-harness/cache/
 .codex-log/
 .codex/sessions/
 .codex/tmp/

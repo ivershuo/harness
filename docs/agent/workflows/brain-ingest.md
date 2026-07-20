@@ -25,5 +25,4 @@ produces durable knowledge that future agents should not rediscover.
 2. Update `compiled_truth` only if the current authoritative answer changed.
 3. Append a `timeline` entry for evidence, decisions, reversals, or notes.
 4. Add or update wiki-links in `brain/index.md` or root pages.
-5. Run `scripts/agent/check-brain`.
-
+5. Run `node scripts/agent/check.mjs --only brain`.

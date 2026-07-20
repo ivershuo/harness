@@ -28,6 +28,64 @@ coding agents:
 The design follows one rule: markdown provides context, but enforcement belongs
 in executable checks.
 
+## Quick Start
+
+Agent Harness requires Node.js 20 or newer and must run inside a Git repository.
+Initialize the current project from the stable `main` branch:
+
+```sh
+npx --yes github:ivershuo/harness init
+```
+
+The CLI detects the project stack and existing CI, recommends modules, and
+shows every planned action before writing. Codex and Claude Code support plus
+the project brain are enabled by default.
+
+Validate an installed harness:
+
+```sh
+npx --yes github:ivershuo/harness doctor
+```
+
+Apply framework updates from `main`:
+
+```sh
+npx --yes github:ivershuo/harness update
+```
+
+For reproducible setup or rollback, pin a release tag:
+
+```sh
+npx --yes github:ivershuo/harness#v0.1.0 init
+```
+
+Use `--dry-run` to inspect an init or update without writing. Automated runs
+must pass `--yes`; updates require a clean worktree unless `--allow-dirty` is
+explicitly supplied.
+
+## Installed File Ownership
+
+The CLI records installed state in the committed
+`.agent-harness/manifest.json` file:
+
+- `seed`: project facts such as product and architecture docs. Once created,
+  the framework never overwrites them. Existing seed files that lack required
+  Harness links or headings receive a content-preserving adaptation proposal.
+- `managed`: shared workflows, skills, evaluations, and checks. Updates replace
+  them only while their recorded hash still matches.
+- `merged`: shared settings such as `.gitignore`, `CLAUDE.md`, and JSON tool
+  configuration. Only managed blocks or missing structured values are added.
+
+When a managed file was changed, the CLI writes a proposed replacement under
+`.agent-harness/proposals/<version>/`. Merge conflicts produce a `.merge.md`
+report instead of a replacement file. In both cases the project file is
+preserved; resolve the proposal deliberately, then run `doctor` again.
+
+Text hashes normalize LF and CRLF line endings, so normal Windows checkouts do
+not appear as local modifications. JSON arrays identify Harness-owned check
+commands and hooks so later versions can replace them without duplicating user
+configuration.
+
 ## Why This Exists
 
 Agent-written code fails in predictable ways when project knowledge is scattered
@@ -69,8 +127,9 @@ scripts/agent/
 
 ## How To Use This In A Real Project
 
-Do not blindly copy every file and call it done. Use this harness as a seed,
-then adapt it to the project.
+Use the CLI for installation and upgrades, then adapt project-owned files to the
+repository. Manual copying remains possible but does not provide ownership,
+drift detection, or safe updates.
 
 1. Start with `AGENTS.md` and `CLAUDE.md`.
    Keep `AGENTS.md` under 150 lines. Remove anything that is generic, obvious,
@@ -126,6 +185,8 @@ language-specific ignores:
 # Local agent/session state
 AGENTS.override.md
 CLAUDE.local.md
+.agent-harness/proposals/
+.agent-harness/cache/
 .codex-log/
 .codex/sessions/
 .codex/tmp/
@@ -176,6 +237,7 @@ docs/agent/
 .codex/rules/
 scripts/agent/
 .mcp.json
+.agent-harness/manifest.json
 ```
 
 ## Lightweight Project Brain
@@ -203,14 +265,11 @@ installable skills can adopt the external project later.
 
 ## Adoption Paths Beyond Copying Files
 
-There are better rollout patterns than copying this directory into every repo:
+The CLI is the primary adoption path for new and existing repositories. Teams
+can layer additional distribution mechanisms on top:
 
 - Create an internal template repository for new projects.
-- Package common Codex skills and MCP setup as a Codex plugin.
-- Keep shared Claude rules or skills in a central repo and symlink or vendor
-  them into projects.
-- Publish a small bootstrap script that installs the baseline files and asks
-  project-specific questions before writing docs.
+- Package reusable Codex and Claude skills as native marketplace plugins.
 - Add a CI check that compares each repo's harness against a versioned baseline.
 - Use a periodic "doc gardener" task to detect stale commands, oversized
   startup files, missing security/performance docs, and unused skills.
@@ -249,15 +308,12 @@ output fail automatically.
 Run these from the repository root:
 
 ```sh
-scripts/agent/check-agent-instructions
-scripts/agent/check-docs
-scripts/agent/check-architecture
-scripts/agent/check-brain
+node scripts/agent/check.mjs
 ```
 
-They currently verify the harness structure, required docs, skill parity between
-Codex and Claude Code, Claude subagents, brain page structure, and the
-size/import discipline of the startup files.
+Use `--only instructions`, `docs`, `architecture`, `brain`, or `templates` for a
+focused check. The generated checker is cross-platform and has no network or
+package dependencies.
 
 ## Maintenance Checklist
 

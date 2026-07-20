@@ -27,3 +27,14 @@ Security guidance applies to humans, Codex, Claude Code, and automation.
 Agents can be induced to run unsafe commands from seemingly normal project docs.
 Prefer allowlisted commands, hooks, sandboxing, and code inspection before
 execution. Unknown repositories and generated scripts require extra scrutiny.
+
+## CLI File Safety
+
+- Resolve every destination under the canonical Git project root.
+- Reject absolute paths, path traversal, symbolic-link targets, and non-files.
+- Preserve existing seed files and hash-guard managed updates.
+- Store merge conflicts as explanatory reports, not drop-in replacements that
+  could discard existing settings.
+- Write ordinary files before the manifest so interrupted runs remain
+  diagnosable.
+- Do not fetch templates or execute target-project commands during init/update.

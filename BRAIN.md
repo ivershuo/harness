@@ -65,5 +65,5 @@ where the link target matches the page `id`.
   why.
 - Append timeline entries instead of deleting historical evidence.
 - Keep entries concise and decision-grade.
-- Run `scripts/agent/check-brain` after editing `BRAIN.md` or `brain/`.
-
+- Run `node scripts/agent/check.mjs --only brain` after editing `BRAIN.md` or
+  `brain/`.

@@ -7,9 +7,7 @@ Quality rules are only useful when agents can verify them.
 Every pull request should run:
 
 ```sh
-scripts/agent/check-agent-instructions
-scripts/agent/check-docs
-scripts/agent/check-architecture
+node scripts/agent/check.mjs
 ```
 
 Add project-native checks as soon as a real stack exists:

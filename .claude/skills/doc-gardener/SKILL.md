@@ -6,5 +6,5 @@ disable-model-invocation: true
 
 Follow `docs/agent/workflows/doc-gardener.md`.
 
-Run `scripts/agent/check-agent-instructions` and `scripts/agent/check-docs`
-after changes.
+Run `node scripts/agent/check.mjs --only instructions` and
+`node scripts/agent/check.mjs --only docs` after changes.

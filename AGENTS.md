@@ -52,10 +52,7 @@ sentence and the verification path is obvious.
 Run the smallest relevant set first, then broaden when shared behavior changes.
 
 ```sh
-scripts/agent/check-agent-instructions
-scripts/agent/check-docs
-scripts/agent/check-architecture
-scripts/agent/check-brain
+node scripts/agent/check.mjs
 ```
 
 Also run project-native checks when present, such as lint, typecheck, unit

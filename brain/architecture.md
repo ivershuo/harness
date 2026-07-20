@@ -15,3 +15,6 @@ scripts, hooks, permissions, tests, review, and CI.
 
 See [[agent-harness-memory]].
 
+Harness distribution follows three ownership modes: project-owned seed files,
+hash-guarded managed files, and structurally merged shared configuration. See
+[[cli-distribution]].

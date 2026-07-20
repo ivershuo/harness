@@ -1,0 +1,36 @@
+{
+  "name": "@ivershuo/agent-harness",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Install and maintain a Codex + Claude Code project harness.",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "agent-harness": "./bin/agent-harness.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "files": [
+    ".agents/skills/",
+    ".claude/agents/",
+    ".claude/rules/",
+    ".claude/skills/",
+    ".codex/rules/",
+    "bin/",
+    "docs/agent/index.md",
+    "docs/agent/evaluations/",
+    "docs/agent/workflows/",
+    "scripts/agent/check.mjs",
+    "src/",
+    "templates/",
+    "LICENSE",
+    "README.md"
+  ],
+  "scripts": {
+    "check": "node scripts/agent/check.mjs",
+    "test": "node --test",
+    "test:e2e": "node --test test/e2e.test.mjs",
+    "verify:package": "node scripts/verify-package.mjs"
+  }
+}
