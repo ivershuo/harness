@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node scripts/agent/check.mjs --only instructions",
+            "command": "node -e \"const c=require('node:child_process'),p=require('node:path'),u=require('node:url');const fail=()=>console.log(JSON.stringify({systemMessage:'Harness Stop adapter unavailable. Run the harness check and doctor manually.'}));const r=c.spawnSync('git',['rev-parse','--show-toplevel'],{encoding:'utf8'});if(r.status!==0){fail();}else{import(u.pathToFileURL(p.join(r.stdout.trim(),'scripts/agent/stop-hook.mjs')).href).catch(fail);}\"",
             "timeout": 30,
             "statusMessage": "Checking agent instruction hygiene"
           }

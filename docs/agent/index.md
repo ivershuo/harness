@@ -6,7 +6,8 @@ This directory holds reusable workflows, evaluations, decisions, and task plans.
 
 - `workflows/`: repeatable task procedures used by skills.
 - `evaluations/`: independent verification playbooks.
-- `active-plans/`: current task plans for non-trivial work.
+- `active-plans/`: plans for substantial functional/high-risk changes; routine
+  edits do not need a plan file.
 - `completed-plans/`: finished task plans with results and follow-up notes.
 - `decisions/`: architecture or harness decisions that should outlive a chat.
 

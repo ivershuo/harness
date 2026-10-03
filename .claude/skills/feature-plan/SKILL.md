@@ -1,10 +1,9 @@
 ---
 name: feature-plan
-description: Plan a non-trivial feature before implementation.
+description: Plan substantial functional changes and unresolved tradeoffs; skip routine edits.
 disable-model-invocation: true
 ---
 
-Follow `docs/agent/workflows/feature-plan.md`.
-
-Create or update `docs/agent/active-plans/<task>.md` with goal, scope,
-non-goals, approach, acceptance criteria, verification, risks, and rollback.
+Follow docs/agent/workflows/feature-plan.md. Routine documentation, copy, styling,
+and small local fixes need no plan file or reviewer. For substantial work,
+record scope, acceptance criteria, minimal verification, risks, and rollback.

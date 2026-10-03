@@ -21,13 +21,23 @@ use Codex, Claude Code, or both.
 
 ## Acceptance Standards
 
-- Behavior changes should be observable through tests, UI checks, API examples,
-  or documented manual verification.
-- Copy and UX changes should match the product voice.
+- CLI behavior changes have observable command output and regression coverage.
 - Backward-incompatible behavior requires an explicit migration or release note.
 - Seed files become project-owned immediately and are never overwritten.
+- Plans stop when inspected files change, and simultaneous Harness writers are
+  serialized rather than silently overwriting each other's results.
+- User hook policies and existing POSIX mode bits and owner/group survive updates.
+- Doctor validates schema records and rejects unsafe brain page paths.
 - Default public commands install from the repository's `main` branch.
 
 ## Open Questions
 
 - npm registry publication and marketplace plugins are deferred beyond v0.1.
+
+## Selection
+
+Both tools and brain are defaults; UI/API and GitHub CI are recommended when
+detected. Explicit `--tools`, `--modules`, and `--ci` flags control initial
+installation. Selections are additive on later reconciliation: the CLI has no
+uninstall operation and does not remove previously installed targets. Required
+skills remain part of each selected tool's contract.

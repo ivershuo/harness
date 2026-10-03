@@ -1,9 +1,8 @@
 ---
 name: doc-gardener
-description: Clean and maintain agent instructions, docs, workflows, and checks to reduce context bloat and stale guidance.
+description: Maintain agent instructions and docs while reducing stale guidance, context bloat, and unnecessary verification.
 ---
 
-Follow `docs/agent/workflows/doc-gardener.md`.
-
-Run `node scripts/agent/check.mjs --only instructions` and
-`node scripts/agent/check.mjs --only docs` after changes.
+Follow docs/agent/workflows/doc-gardener.md. Use one applicable Harness scope;
+one full node scripts/agent/check.mjs covers all scopes when needed. Docs-only
+edits do not require business tests, builds, services, browsers, or reviewers.

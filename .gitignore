@@ -49,6 +49,7 @@ AGENTS.override.md
 CLAUDE.local.md
 .agent-harness/proposals/
 .agent-harness/cache/
+.agent-harness/write.lock
 .codex-log/
 .codex/sessions/
 .codex/tmp/

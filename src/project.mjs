@@ -1,7 +1,7 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
-import { canonicalRoot } from "./fs-safe.mjs";
+import { canonicalRoot, readProjectFile } from "./fs-safe.mjs";
 
 function git(args, cwd) {
   return spawnSync("git", args, { cwd, encoding: "utf8" });
@@ -20,11 +20,11 @@ export function isGitDirty(root) {
   return result.stdout.trim().length > 0;
 }
 
-function readPackage(root) {
-  const file = path.join(root, "package.json");
-  if (!existsSync(file)) return null;
+async function readPackage(root) {
+  const content = await readProjectFile(root, "package.json");
+  if (content === null) return null;
   try {
-    return JSON.parse(readFileSync(file, "utf8"));
+    return JSON.parse(content);
   } catch {
     return null;
   }
@@ -48,8 +48,8 @@ function safeProjectName(value, fallback) {
   return sanitized || fallback;
 }
 
-export function detectProject(root) {
-  const packageJson = readPackage(root);
+export async function detectProject(root) {
+  const packageJson = await readPackage(root);
   const dependencies = {
     ...(packageJson?.dependencies ?? {}),
     ...(packageJson?.devDependencies ?? {}),
@@ -81,10 +81,9 @@ export function detectProject(root) {
       if (typeof packageJson.scripts?.[script] === "string") qualityCommands.push(`${manager} run ${script}`);
     }
   }
-  const pyprojectPath = path.join(root, "pyproject.toml");
-  if (existsSync(pyprojectPath)) {
+  const pyproject = await readProjectFile(root, "pyproject.toml");
+  if (pyproject !== null) {
     stacks.push("python");
-    const pyproject = readFileSync(pyprojectPath, "utf8");
     if (/\bpytest\b/.test(pyproject)) qualityCommands.push("pytest");
     if (/\bruff\b/.test(pyproject)) qualityCommands.push("ruff check .");
     if (/\bmypy\b/.test(pyproject)) qualityCommands.push("mypy .");

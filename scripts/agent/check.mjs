@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 
-import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { lstatSync, readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
+import { validateManifest, validateRelativePath } from "./manifest-schema.mjs";
 
 const root = process.cwd();
 const failures = [];
@@ -12,17 +13,44 @@ function fail(scope, message) {
 }
 
 function target(relativePath) {
+  validateRelativePath(relativePath);
   return path.join(root, ...relativePath.split("/"));
 }
 
+function safeTarget(relativePath) {
+  const destination = target(relativePath);
+  let current = root;
+  for (const part of relativePath.split("/")) {
+    current = path.join(current, part);
+    try {
+      if (lstatSync(current).isSymbolicLink()) throw new Error(`refusing to follow symlink: ${relativePath}`);
+    } catch (error) {
+      if (error.code === "ENOENT") return destination;
+      throw error;
+    }
+  }
+  return destination;
+}
+
 function exists(relativePath) {
-  return existsSync(target(relativePath));
+  try {
+    lstatSync(safeTarget(relativePath));
+    return true;
+  } catch (error) {
+    if (error.code !== "ENOENT") fail("filesystem", error.message);
+    return false;
+  }
 }
 
 function text(relativePath) {
   try {
-    return readFileSync(target(relativePath), "utf8");
-  } catch {
+    const file = safeTarget(relativePath);
+    const stat = lstatSync(file);
+    if (!stat.isFile()) throw new Error(`target is not a file: ${relativePath}`);
+    if (stat.size > 5 * 1024 * 1024) throw new Error(`target exceeds 5 MiB safety limit: ${relativePath}`);
+    return readFileSync(file, "utf8");
+  } catch (error) {
+    if (error.code !== "ENOENT") fail("filesystem", error.message);
     return null;
   }
 }
@@ -43,8 +71,12 @@ function requireIncludes(scope, relativePath, pattern, message) {
 
 function childDirectories(relativePath) {
   if (!exists(relativePath)) return [];
-  return readdirSync(target(relativePath))
-    .filter((name) => statSync(path.join(target(relativePath), name)).isDirectory())
+  return readdirSync(safeTarget(relativePath), { withFileTypes: true })
+    .filter((entry) => {
+      if (entry.isSymbolicLink()) fail("filesystem", `refusing to follow symlink: ${relativePath}/${entry.name}`);
+      return entry.isDirectory();
+    })
+    .map((entry) => entry.name)
     .sort();
 }
 
@@ -57,13 +89,7 @@ function installedSelection() {
   }
   try {
     const manifest = JSON.parse(content);
-    if (
-      !Array.isArray(manifest.selection?.tools) ||
-      !Array.isArray(manifest.selection?.modules) ||
-      !["github", "none"].includes(manifest.selection?.ci)
-    ) {
-      throw new Error("invalid selection");
-    }
+    validateManifest(manifest);
     selectionCache = manifest.selection;
   } catch (error) {
     fail("manifest", `.agent-harness/manifest.json is invalid: ${error.message}`);
@@ -90,6 +116,8 @@ function moduleEnabled(module) {
 function checkInstructions() {
   const scope = "instructions";
   const agents = requireFile(scope, "AGENTS.md");
+  requireFile(scope, "scripts/agent/manifest-schema.mjs");
+  requireFile(scope, "scripts/agent/stop-hook.mjs");
   if (agents && agents.split(/\r?\n/).length > 150) fail(scope, "AGENTS.md must stay under 150 lines");
   requireIncludes(scope, "AGENTS.md", "docs/SECURITY.md", "AGENTS.md must link security docs");
   requireIncludes(scope, "AGENTS.md", "docs/PERFORMANCE.md", "AGENTS.md must link performance docs");
@@ -99,9 +127,16 @@ function checkInstructions() {
 
   const codexSkills = toolEnabled("codex") ? childDirectories(".agents/skills") : [];
   const claudeSkills = toolEnabled("claude") ? childDirectories(".claude/skills") : [];
+  const requiredSkills = ["feature-plan", "bug-repro", "pr-review", "security-review", "doc-gardener"];
+  if (moduleEnabled("brain")) requiredSkills.push("brain-ingest");
+  for (const tool of ["codex", "claude"]) {
+    if (!toolEnabled(tool)) continue;
+    const directory = tool === "codex" ? ".agents/skills" : ".claude/skills";
+    for (const skill of requiredSkills) requireFile(scope, `${directory}/${skill}/SKILL.md`);
+  }
   for (const skill of codexSkills) requireFile(scope, `.agents/skills/${skill}/SKILL.md`);
   for (const skill of claudeSkills) requireFile(scope, `.claude/skills/${skill}/SKILL.md`);
-  if (codexSkills.length > 0 && claudeSkills.length > 0) {
+  if (toolEnabled("codex") && toolEnabled("claude")) {
     const codexSet = codexSkills.join("\n");
     const claudeSet = claudeSkills.join("\n");
     if (codexSet !== claudeSet) fail(scope, "Codex and Claude skill names must stay in parity");
@@ -166,12 +201,16 @@ function checkBrain() {
   for (const file of ["background", "architecture", "flow", "mindmap", "stack", "roadmap"]) {
     requireFile(scope, `brain/${file}.md`);
   }
-  const pagesDirectory = target("brain/pages");
-  if (!existsSync(pagesDirectory)) {
+  if (!exists("brain/pages")) {
     fail(scope, "missing brain/pages/");
     return;
   }
-  const pages = readdirSync(pagesDirectory).filter((name) => name.endsWith(".md"));
+  const pagesDirectory = safeTarget("brain/pages");
+  const entries = readdirSync(pagesDirectory, { withFileTypes: true });
+  for (const entry of entries) {
+    if (entry.isSymbolicLink()) fail(scope, `refusing to follow symlink: brain/pages/${entry.name}`);
+  }
+  const pages = entries.filter((entry) => !entry.isSymbolicLink() && entry.name.endsWith(".md")).map((entry) => entry.name);
   if (pages.length === 0) fail(scope, "brain/pages must contain at least one page");
   for (const page of pages) {
     const relative = `brain/pages/${page}`;
@@ -211,6 +250,9 @@ function checkTemplates() {
     if (!new Set(["seed", "managed", "merged"]).has(entry.ownership)) {
       fail(scope, `invalid ownership for ${entry.target}`);
     }
+    if (entry.adapter !== undefined && (entry.adapter !== "claude-skill" || entry.tool !== "claude" || !entry.target.endsWith("/SKILL.md"))) {
+      fail(scope, `invalid adapter for ${entry.target}`);
+    }
     requireFile(scope, entry.source);
   }
 }
@@ -234,7 +276,9 @@ if (onlyIndex !== -1) {
   selected = [name];
 }
 
-for (const name of selected) checks[name]();
+for (const name of selected) {
+  try { checks[name](); } catch (error) { fail(name, error.message); }
+}
 
 if (failures.length > 0) {
   for (const failure of failures) console.error(`check: ${failure}`);

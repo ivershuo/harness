@@ -8,6 +8,8 @@ knowledge lives under `docs/`.
 ## Sources of Truth
 
 - Product behavior: `docs/PRODUCT.md`
+- Design rules: when root `DESIGN.md` exists, read it before design or UI work
+  and follow it as the project's design rules.
 - Architecture boundaries: `docs/ARCHITECTURE.md`
 - Quality gates: `docs/QUALITY.md`
 - Security requirements: `docs/SECURITY.md`
@@ -15,6 +17,9 @@ knowledge lives under `docs/`.
 - Operations and release notes: `docs/OPERATIONS.md`
 - Agent workflows and evaluations: `docs/agent/`
 - Durable decisions and rationale: `BRAIN.md` and `brain/`
+
+Use this list as a task-specific lookup, not a startup reading checklist. Read
+only relevant sections; load workflows, evaluations, and skills when needed.
 
 Do not treat chat history, local memories, or PR comments as durable project
 truth. If a rule should be reused, add it to docs, a skill, a script, a hook,
@@ -35,7 +40,8 @@ reconstruct from code and likely to matter in future sessions.
 
 ## Required Workflow
 
-For non-trivial work:
+For substantial functional changes involving shared behavior, public contracts,
+or security/data risks:
 
 1. Read the relevant docs and code paths.
 2. Create or update a plan in `docs/agent/active-plans/`.
@@ -44,26 +50,35 @@ For non-trivial work:
 5. Ask for or run an independent evaluator/reviewer pass.
 6. Move completed plans to `docs/agent/completed-plans/`.
 
-For small fixes, skip the plan file only when the diff can be described in one
-sentence and the verification path is obvious.
+For documentation, copy, styling, and small local fixes, skip plan files and
+independent reviewers unless a concrete risk requires them. File count alone
+does not make a task substantial.
 
 ## Quality Gates
 
-Run the smallest relevant set first, then broaden when shared behavior changes.
+Default to diff inspection and at most one fast, focused check for small changes.
+Use existing coverage; do not add tests that merely mirror a trivial edit.
+Choose evidence against the affected acceptance criteria; stop verification once
+those are covered. Follow `docs/QUALITY.md` for escalation conditions.
 
 ```sh
 node scripts/agent/check.mjs
 ```
 
-Also run project-native checks when present, such as lint, typecheck, unit
-tests, integration tests, security scans, Playwright journeys, or API contract
-tests.
+The command above is a Harness gate, not a mandatory full run after every edit.
+Do not start services, open browsers, run builds/full suites, install test tools,
+or reproduce CI matrices merely because they exist. Do so only when explicitly
+requested or when affected acceptance criteria need runtime or visual evidence;
+state that reason first. Keep routine local verification within two minutes;
+report unfinished checks instead of silently extending or claiming success.
+Reuse passing results for unchanged code; reviewers do not rerun them by default.
 
 ## Review Guidelines
 
 - Lead with correctness, security, data loss, privacy, performance, and
   compatibility risks.
-- Require tests for changed behavior unless the change is documentation-only.
+- Require meaningful evidence for changed behavior; reuse existing tests and
+  add regressions only for uncovered bugs or substantive new behavior.
 - Require docs updates when product behavior, architecture boundaries, setup,
   operations, security, or performance assumptions change.
 - Treat secrets, PII logging, auth bypasses, unsafe migrations, and unbounded

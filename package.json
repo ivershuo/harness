@@ -1,6 +1,6 @@
 {
   "name": "@ivershuo/agent-harness",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "Install and maintain a Codex + Claude Code project harness.",
   "license": "MIT",
@@ -15,21 +15,24 @@
     ".agents/skills/",
     ".claude/agents/",
     ".claude/rules/",
-    ".claude/skills/",
+    ".claude/CLAUDE.md",
     ".codex/rules/",
     "bin/",
     "docs/agent/index.md",
     "docs/agent/evaluations/",
     "docs/agent/workflows/",
     "scripts/agent/check.mjs",
+    "scripts/agent/manifest-schema.mjs",
+    "scripts/agent/stop-hook.mjs",
     "src/",
     "templates/",
+    "BRAIN.md",
     "LICENSE",
     "README.md"
   ],
   "scripts": {
     "check": "node scripts/agent/check.mjs",
-    "test": "node --test",
+    "test": "node scripts/test.mjs",
     "test:e2e": "node --test test/e2e.test.mjs",
     "verify:package": "node scripts/verify-package.mjs"
   }

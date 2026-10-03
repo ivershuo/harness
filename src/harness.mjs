@@ -3,6 +3,8 @@ import { loadCatalog, renderEntry, selectEntries } from "./catalog.mjs";
 import {
   atomicWrite,
   hashContent,
+  hashExactContent,
+  assertNoSymlink,
   readProjectFile,
   resolveTarget,
   stableJson,
@@ -13,187 +15,10 @@ import {
   MANIFEST_SCHEMA_VERSION,
   SOURCE,
 } from "./constants.mjs";
-
-function markers(entry) {
-  if (entry.markerStyle === "hash") {
-    return ["# agent-harness:start", "# agent-harness:end"];
-  }
-  return ["<!-- agent-harness:start -->", "<!-- agent-harness:end -->"];
-}
-
-function mergeBlock(current, block, entry) {
-  const [start, end] = markers(entry);
-  const eol = current?.includes("\r\n") ? "\r\n" : "\n";
-  const normalizedBlock = block.replace(/\r\n?/g, "\n").trimEnd().replaceAll("\n", eol);
-  const replacement = `${start}${eol}${normalizedBlock}${eol}${end}`;
-  if (current === null || current.trim().length === 0) return `${replacement}\n`;
-  const startIndex = current.indexOf(start);
-  const endIndex = current.indexOf(end);
-  if ((startIndex === -1) !== (endIndex === -1) || endIndex < startIndex) {
-    throw new Error("managed block markers are incomplete");
-  }
-  if (startIndex === -1) return `${current.trimEnd()}${eol}${eol}${replacement}${eol}`;
-  if (current.indexOf(start, startIndex + start.length) !== -1 || current.indexOf(end, endIndex + end.length) !== -1) {
-    throw new Error("managed block markers are duplicated");
-  }
-  const afterEnd = endIndex + end.length;
-  return `${current.slice(0, startIndex)}${replacement}${current.slice(afterEnd)}`;
-}
-
-function itemKey(value) {
-  return JSON.stringify(value);
-}
-
-function isHarnessCheckCommand(value) {
-  if (typeof value !== "string") return false;
-  return (
-    value.includes("node scripts/agent/check.mjs") ||
-    value.includes("scripts/agent/check-agent-instructions") ||
-    value.includes("scripts/agent/check-docs") ||
-    value.includes("scripts/agent/check-architecture") ||
-    value.includes("scripts/agent/check-brain")
-  );
-}
-
-function harnessArrayIdentity(value) {
-  if (isHarnessCheckCommand(value)) {
-    return "agent-harness-check-command";
-  }
-  if (
-    value &&
-    typeof value === "object" &&
-    value.type === "command" &&
-    typeof value.command === "string" &&
-    isHarnessCheckCommand(value.command)
-  ) {
-    return "agent-harness-check-hook";
-  }
-  return null;
-}
-
-function containsHarnessArrayItem(value) {
-  if (harnessArrayIdentity(value)) return true;
-  if (Array.isArray(value)) return value.some(containsHarnessArrayItem);
-  if (value && typeof value === "object") return Object.values(value).some(containsHarnessArrayItem);
-  return false;
-}
-
-function stripHarnessArrayItems(value) {
-  if (harnessArrayIdentity(value)) return undefined;
-  if (Array.isArray(value)) {
-    return value.map(stripHarnessArrayItems).filter((item) => item !== undefined);
-  }
-  if (value && typeof value === "object") {
-    return Object.fromEntries(
-      Object.entries(value)
-        .map(([key, item]) => [key, stripHarnessArrayItems(item)])
-        .filter(([, item]) => item !== undefined),
-    );
-  }
-  return value;
-}
-
-function containsNonEmptyArray(value) {
-  if (Array.isArray(value)) return value.length > 0 || value.some(containsNonEmptyArray);
-  if (value && typeof value === "object") return Object.values(value).some(containsNonEmptyArray);
-  return false;
-}
-
-function mergeJsonValue(current, desired) {
-  if (Array.isArray(desired)) {
-    const source = Array.isArray(current) ? current : [];
-    const merged = [...source];
-    for (const item of desired) {
-      const identity = harnessArrayIdentity(item);
-      if (identity) {
-        const indexes = merged
-          .map((existing, index) => harnessArrayIdentity(existing) === identity ? index : -1)
-          .filter((index) => index !== -1);
-        if (indexes.length === 0) merged.push(item);
-        else {
-          merged[indexes[0]] = item;
-          for (const index of indexes.slice(1).reverse()) merged.splice(index, 1);
-        }
-      } else if (containsHarnessArrayItem(item)) {
-        const indexes = merged
-          .map((existing, index) => containsHarnessArrayItem(existing) ? index : -1)
-          .filter((index) => index !== -1);
-        if (indexes.length === 0) merged.push(item);
-        else {
-          const first = indexes[0];
-          const rebuilt = [];
-          for (let index = 0; index < merged.length; index += 1) {
-            if (index === first) rebuilt.push(item);
-            if (!indexes.includes(index)) {
-              rebuilt.push(merged[index]);
-              continue;
-            }
-            const stripped = stripHarnessArrayItems(merged[index]);
-            if (containsNonEmptyArray(stripped)) rebuilt.push(stripped);
-          }
-          merged.splice(0, merged.length, ...rebuilt);
-        }
-      } else if (!merged.some((existing) => itemKey(existing) === itemKey(item))) {
-        merged.push(item);
-      }
-    }
-    return { value: merged, conflict: current !== undefined && !Array.isArray(current) };
-  }
-  if (desired && typeof desired === "object") {
-    const source = current && typeof current === "object" && !Array.isArray(current) ? current : {};
-    const merged = { ...source };
-    let conflict = current !== undefined && source !== current;
-    for (const [key, value] of Object.entries(desired)) {
-      const result = mergeJsonValue(source[key], value);
-      merged[key] = result.value;
-      conflict ||= result.conflict;
-    }
-    return { value: merged, conflict };
-  }
-  if (current === undefined || current === desired) return { value: desired, conflict: false };
-  return { value: current, conflict: true };
-}
-
-function mergeJson(current, desiredText) {
-  const desired = JSON.parse(desiredText);
-  const existing = current === null || current.trim() === "" ? {} : JSON.parse(current);
-  const result = mergeJsonValue(existing, desired);
-  return { content: stableJson(result.value), conflict: result.conflict };
-}
-
-async function readManifest(root) {
-  const content = await readProjectFile(root, MANIFEST_PATH);
-  if (content === null) return null;
-  let manifest;
-  try {
-    manifest = JSON.parse(content);
-  } catch {
-    throw new Error(`${MANIFEST_PATH} is not valid JSON`);
-  }
-  if (manifest.schemaVersion !== MANIFEST_SCHEMA_VERSION) {
-    throw new Error(`unsupported manifest schema: ${manifest.schemaVersion}`);
-  }
-  if (
-    !manifest.selection ||
-    !Array.isArray(manifest.selection.tools) ||
-    !manifest.selection.tools.every((item) => typeof item === "string") ||
-    !Array.isArray(manifest.selection.modules) ||
-    !manifest.selection.modules.every((item) => typeof item === "string") ||
-    !["github", "none"].includes(manifest.selection.ci)
-  ) {
-    throw new Error(`${MANIFEST_PATH} has an invalid selection`);
-  }
-  if (!manifest.files || typeof manifest.files !== "object" || Array.isArray(manifest.files)) {
-    throw new Error(`${MANIFEST_PATH} has invalid files`);
-  }
-  if (!manifest.pending || typeof manifest.pending !== "object" || Array.isArray(manifest.pending)) {
-    throw new Error(`${MANIFEST_PATH} has invalid pending proposals`);
-  }
-  for (const target of [...Object.keys(manifest.files), ...Object.keys(manifest.pending)]) {
-    resolveTarget(root, target);
-  }
-  return manifest;
-}
+import { readManifest } from "./manifest.mjs";
+import { mergeBlock, mergeJson } from "./merge.mjs";
+import { withWriteLock } from "./write-lock.mjs";
+import { validateSelection } from "../scripts/agent/manifest-schema.mjs";
 
 function proposalPath(target) {
   return `.agent-harness/proposals/${HARNESS_VERSION}/${target}`;
@@ -305,21 +130,32 @@ function mergeReport(target, reason, desired) {
   ].join("\n");
 }
 
-async function addWrite(operations, root, target, content, executable, reason) {
-  const current = await readProjectFile(root, target);
+async function addWrite(operations, root, target, content, executable, reason, read = readProjectFile) {
+  const current = await read(root, target);
   if (current === content) return false;
   operations.push({ kind: "write", target, content, executable, reason });
   return true;
 }
 
-async function addProposal(operations, root, target, content, reason) {
+async function addProposal(operations, root, target, content, reason, read = readProjectFile) {
   const proposal = proposalPath(target);
-  await addWrite(operations, root, proposal, content, false, reason);
+  await addWrite(operations, root, proposal, content, false, reason, read);
   return proposal;
 }
 
 export async function planHarness({ root, selection, command, projectName, qualityCommands = [] }) {
-  const previous = await readManifest(root);
+  validateSelection(selection);
+  const preconditions = {};
+  const read = async (projectRoot, target) => {
+    const content = await readProjectFile(projectRoot, target);
+    const observed = hashExactContent(content);
+    if (Object.hasOwn(preconditions, target) && preconditions[target] !== observed) {
+      throw new Error(`file changed while creating plan: ${target}; rerun the command`);
+    }
+    preconditions[target] = observed;
+    return content;
+  };
+  const previous = await readManifest(root, read);
   if (command === "update" && !previous) {
     throw new Error("project is not initialized; run agent-harness init first");
   }
@@ -343,13 +179,16 @@ export async function planHarness({ root, selection, command, projectName, quali
   for (const entry of entries) {
     const desired = await renderEntry(entry, variables);
     const templateHash = hashContent(desired);
-    const current = await readProjectFile(root, entry.target);
+    const current = await read(root, entry.target);
     const currentHash = current === null ? null : hashContent(current);
     const prior = files[entry.target];
+    if (prior && (prior.ownership !== entry.ownership || prior.module !== entry.module)) {
+      throw new Error(`manifest ownership does not match catalog: ${entry.target}`);
+    }
 
     if (entry.ownership === "seed") {
       if (current === null) {
-        await addWrite(operations, root, entry.target, desired, entry.executable, "install seed");
+        await addWrite(operations, root, entry.target, desired, entry.executable, "install seed", read);
         actions.push({ action: "create", path: entry.target, ownership: "seed" });
         files[entry.target] = fileRecord(entry, templateHash, templateHash, "project-owned");
         delete pending[entry.target];
@@ -362,7 +201,7 @@ export async function planHarness({ root, selection, command, projectName, quali
           const proposalContent = safeCandidate
             ? adaptation
             : mergeReport(entry.target, issues.join("; "), desired);
-          const proposal = await addProposal(operations, root, proposalTarget, proposalContent, "seed file needs adaptation");
+          const proposal = await addProposal(operations, root, proposalTarget, proposalContent, "seed file needs adaptation", read);
           actions.push({ action: "proposal", path: entry.target, ownership: "seed" });
           pending[entry.target] = {
             proposal,
@@ -386,23 +225,23 @@ export async function planHarness({ root, selection, command, projectName, quali
         delete pending[entry.target];
       } else if (current === null) {
         if (!prior) {
-          await addWrite(operations, root, entry.target, desired, entry.executable, "install managed file");
+          await addWrite(operations, root, entry.target, desired, entry.executable, "install managed file", read);
           actions.push({ action: "create", path: entry.target, ownership: "managed" });
           files[entry.target] = fileRecord(entry, templateHash, templateHash, "managed");
           delete pending[entry.target];
         } else {
-          const proposal = await addProposal(operations, root, entry.target, desired, "restore missing managed file");
+          const proposal = await addProposal(operations, root, entry.target, desired, "restore missing managed file", read);
           actions.push({ action: "proposal", path: entry.target, ownership: "managed" });
           files[entry.target] = fileRecord(entry, templateHash, prior.installedHash, "conflict");
           pending[entry.target] = { proposal, targetVersion: HARNESS_VERSION, reason: "missing" };
         }
       } else if (prior?.state === "managed" && currentHash === prior.installedHash) {
-        await addWrite(operations, root, entry.target, desired, entry.executable, "update managed file");
+        await addWrite(operations, root, entry.target, desired, entry.executable, "update managed file", read);
         actions.push({ action: "update", path: entry.target, ownership: "managed" });
         files[entry.target] = fileRecord(entry, templateHash, templateHash, "managed");
         delete pending[entry.target];
       } else {
-        const proposal = await addProposal(operations, root, entry.target, desired, "managed file differs");
+        const proposal = await addProposal(operations, root, entry.target, desired, "managed file differs", read);
         actions.push({ action: "proposal", path: entry.target, ownership: "managed" });
         files[entry.target] = fileRecord(entry, templateHash, prior?.installedHash ?? currentHash, "conflict");
         pending[entry.target] = { proposal, targetVersion: HARNESS_VERSION, reason: "modified" };
@@ -418,7 +257,7 @@ export async function planHarness({ root, selection, command, projectName, quali
         if (merged.conflict) throw new Error("existing scalar conflicts with required JSON value");
         const mergedHash = hashContent(merged.content);
         if (currentHash !== mergedHash) {
-          await addWrite(operations, root, entry.target, merged.content, entry.executable, "merge harness settings");
+          await addWrite(operations, root, entry.target, merged.content, entry.executable, "merge harness settings", read);
           actions.push({ action: current === null ? "create" : "merge", path: entry.target, ownership: "merged" });
         } else {
           actions.push({ action: "current", path: entry.target, ownership: "merged" });
@@ -433,6 +272,7 @@ export async function planHarness({ root, selection, command, projectName, quali
           `${entry.target}.merge.md`,
           report,
           `merge conflict: ${error.message}`,
+          read,
         );
         actions.push({ action: "proposal", path: entry.target, ownership: "merged" });
         files[entry.target] = fileRecord(entry, templateHash, currentHash, "conflict");
@@ -469,15 +309,22 @@ export async function planHarness({ root, selection, command, projectName, quali
     });
   }
 
-  return { operations, actions, manifest };
+  return { operations, actions, manifest, preconditions };
 }
 
 export async function applyPlan(root, plan) {
-  const ordinary = plan.operations.filter((operation) => operation.kind !== "manifest");
-  const manifests = plan.operations.filter((operation) => operation.kind === "manifest");
-  for (const operation of [...ordinary, ...manifests]) {
-    await atomicWrite(root, operation.target, operation.content, operation.executable);
-  }
+  await withWriteLock(root, async () => {
+    for (const [target, expected] of Object.entries(plan.preconditions)) {
+      if (hashExactContent(await readProjectFile(root, target)) !== expected) {
+        throw new Error(`file changed since plan was created: ${target}; rerun the command`);
+      }
+    }
+    const ordinary = plan.operations.filter((operation) => operation.kind !== "manifest");
+    const manifests = plan.operations.filter((operation) => operation.kind === "manifest");
+    for (const operation of [...ordinary, ...manifests]) {
+      await atomicWrite(root, operation.target, operation.content, operation.executable, plan.preconditions[operation.target]);
+    }
+  });
 }
 
 export async function doctorHarness(root) {
@@ -524,6 +371,9 @@ export async function doctorHarness(root) {
       }
       const currentHash = hashContent(content);
       const entry = entryByTarget.get(target);
+      if (entry && (entry.ownership !== record.ownership || entry.module !== record.module)) {
+        throw new Error("manifest ownership does not match catalog");
+      }
       if (entry && record.ownership !== "seed") {
         const desired = await renderEntry(entry, {
           PROJECT_NAME: "",
@@ -588,7 +438,11 @@ export async function doctorHarness(root) {
   if (manifest.selection.modules.includes("brain")) {
     try {
       const index = (await readProjectFile(root, "brain/index.md")) ?? "";
+      await assertNoSymlink(root, "brain/pages");
       const pages = await readdir(resolveTarget(root, "brain/pages"), { withFileTypes: true });
+      for (const page of pages.filter((entry) => entry.isSymbolicLink())) {
+        issues.push({ severity: "error", path: `brain/pages/${page.name}`, message: "refusing to follow symlink" });
+      }
       for (const page of pages.filter((entry) => entry.isFile() && entry.name.endsWith(".md"))) {
         const relative = `brain/pages/${page.name}`;
         const content = (await readProjectFile(root, relative)) ?? "";

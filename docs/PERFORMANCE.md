@@ -1,31 +1,30 @@
 # Performance
 
-Performance requirements must be explicit because agents otherwise optimize for
-visible correctness only.
+The CLI must remain dependency-free, operate on declared templates and selected
+project metadata, and avoid runtime network or model calls.
 
 ## Budgets
 
-Define project-specific budgets here:
-
-- Page load or interaction latency:
-- API p95 latency:
-- Background job duration:
-- Database query count:
-- Bundle size:
-- Model/tool call count:
+- Individual project files: at most 5 MiB in detection, reconciliation, and checks.
+- Stop adapter input/output: at most 64 KiB input and 4,000 characters of failing
+  checker feedback; one automatic continuation per Stop chain.
+- Stop checker: 20 second execution timeout inside the 30 second Codex hook.
+- Runtime external network and model calls: zero.
+- Install/update work scales with selected catalog entries. Doctor additionally
+  visits project-owned brain pages; it does not scan dependency directories.
+- Local SSD reference targets: default init below 2 seconds, doctor and Stop
+  instruction checks below 1 second. These are regression-investigation targets,
+  not machine-independent CI timing assertions.
 
 ## Review Checklist
 
-- Hot paths do not add avoidable network, database, filesystem, or model calls.
-- Loops over unbounded data are paginated, streamed, or capped.
-- Caches have clear invalidation and ownership.
-- UI changes avoid layout shift and excessive bundle growth.
-- Observability can identify regressions after deployment.
+- Avoid repeated template reads or whole-project discovery scans.
+- Keep generated checks independent of package-cache imports.
+- Maintain explicit input-size, subprocess-output, and timeout bounds.
+- Inspect large brain collections separately when diagnosing doctor latency.
 
 ## Verification
 
-Use the smallest meaningful performance check for a change: benchmark, trace,
-query plan, bundle analyzer, load test, or production metric comparison.
-
-The Harness CLI must remain bounded by the number and size of catalog files. It
-must not scan dependency directories or make runtime network calls.
+Use fresh temporary Git repositories for timing init, doctor, and hooks. Compare
+package size through `npm run verify:package`. Avoid hard wall-clock assertions
+in shared CI because operating systems, filesystem caches, and runners vary.

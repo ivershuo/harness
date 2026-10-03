@@ -7,7 +7,13 @@ paths:
 
 # Frontend Rules
 
-- Verify user-facing changes with browser checks when tooling exists.
-- Cover loading, empty, error, and success states.
-- Avoid text overflow and incoherent overlap across viewport sizes.
-- Prefer project design system components over one-off UI primitives.
+- Read root DESIGN.md when present and prefer existing design system components.
+- Copy, colors/tokens, comments, and simple styling default to diff inspection
+  or one existing focused check; no automatic server/browser or new tests.
+- Use browser verification when affected acceptance criteria need runtime/visual
+  evidence, or on explicit request. Visual redesigns/layout fixes need a
+  representative preview/screenshot comparison. State what it will establish,
+  reuse an existing preview, and check one affected case first.
+- Check loading/empty/error/success states, viewports, overflow, screenshots,
+  and accessibility only when specifically affected; do not sweep every state.
+- Stop when sufficient evidence exists. Follow docs/QUALITY.md local limits.

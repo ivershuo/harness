@@ -15,7 +15,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node scripts/agent/check.mjs --only instructions"
+            "command": "{{STOP_HOOK_COMMAND}}"
           }
         ]
       }

@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node scripts/agent/check.mjs --only instructions",
+            "timeout": 30,
+            "statusMessage": "Checking agent instruction hygiene"
+          }
+        ]
+      }
+    ]
+  }
+}

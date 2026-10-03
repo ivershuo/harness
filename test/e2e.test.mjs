@@ -5,9 +5,40 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
+import { HARNESS_VERSION, STOP_HOOK_COMMAND } from "../src/constants.mjs";
+import { adaptTemplate, renderEntry } from "../src/catalog.mjs";
 
 const packageRoot = path.resolve(fileURLToPath(new URL("../", import.meta.url)));
 const cli = path.join(packageRoot, "bin", "agent-harness.mjs");
+
+test("Claude skill rendering shares the canonical body and preserves manual invocation", async () => {
+  const source = ".agents/skills/feature-plan/SKILL.md";
+  const canonical = await readFile(path.join(packageRoot, source), "utf8");
+  const rendered = await renderEntry({ source, adapter: "claude-skill" }, {});
+  assert.match(rendered, /^---\ndisable-model-invocation: true\n/);
+  assert.equal(rendered.replace("disable-model-invocation: true\n", ""), canonical);
+});
+
+test("catalog rendering rejects unknown adapters and unsafe skill metadata", async () => {
+  const source = ".agents/skills/feature-plan/SKILL.md";
+  await assert.rejects(renderEntry({ source, adapter: "unknown" }, {}), /unknown template adapter/);
+  await assert.rejects(renderEntry({ source: "README.md", adapter: "claude-skill" }, {}), /skill frontmatter/);
+  await assert.rejects(renderEntry({ source: ".claude/skills/feature-plan/SKILL.md", adapter: "claude-skill" }, {}), /invocation metadata/);
+});
+
+test("Claude skill adapter rejects quoted policy keys and unsupported YAML forms", () => {
+  for (const key of ['"disable-model-invocation"', "'disable-model-invocation'"]) {
+    const content = `---\nname: example\ndescription: Example skill\n${key}: false\n---\n\nBody\n`;
+    assert.throws(() => adaptTemplate(content, "claude-skill"), /invocation metadata/);
+  }
+  for (const metadata of [
+    '"name": example\ndescription: Example skill',
+    "name: example\nname: duplicate",
+    "name: example\ndescription: |\n  Multiline metadata",
+  ]) {
+    assert.throws(() => adaptTemplate(`---\n${metadata}\n---\nBody\n`, "claude-skill"), /skill frontmatter/);
+  }
+});
 
 function run(command, args, cwd) {
   return spawnSync(command, args, { cwd, encoding: "utf8" });
@@ -211,7 +242,7 @@ test("update preserves modified managed files and creates a proposal", async () 
     root,
     ".agent-harness",
     "proposals",
-    "0.1.0",
+    HARNESS_VERSION,
     "docs",
     "agent",
     "evaluations",
@@ -259,7 +290,7 @@ test("invalid existing JSON is preserved and reported as a proposal", async () =
   assert.match(report, /Do not replace it with this report/);
 });
 
-test("JSON merge replaces the Harness hook by stable identity", async () => {
+test("JSON merge migrates exact legacy hooks in their original matcher groups", async () => {
   const root = await repository();
   await mkdir(path.join(root, ".claude"), { recursive: true });
   const oldHook = {
@@ -289,12 +320,14 @@ test("JSON merge replaces the Harness hook by stable identity", async () => {
   const serialized = JSON.stringify(settings.hooks.Stop);
   assert.doesNotMatch(serialized, /check-agent-instructions/);
   assert.doesNotMatch(serialized, /check-docs/);
-  assert.match(serialized, /check\.mjs --only instructions/);
+  assert.match(serialized, /stop-hook\.mjs/);
   assert.match(serialized, /npm test/);
   assert.match(serialized, /npm run lint/);
-  assert.equal((serialized.match(/check\.mjs --only instructions/g) ?? []).length, 1);
   const alpha = settings.hooks.Stop.find((group) => group.matcher === "alpha");
   const beta = settings.hooks.Stop.find((group) => group.matcher === "beta");
+  assert.equal(settings.hooks.Stop.length, 2);
+  assert.equal(alpha.hooks.filter((hook) => hook.command === STOP_HOOK_COMMAND).length, 1);
+  assert.equal(beta.hooks.filter((hook) => hook.command === STOP_HOOK_COMMAND).length, 1);
   assert.match(JSON.stringify(alpha), /npm test/);
   assert.doesNotMatch(JSON.stringify(alpha), /npm run lint/);
   assert.match(JSON.stringify(beta), /npm run lint/);

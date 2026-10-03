@@ -2,6 +2,10 @@
 
 Use this as the default evaluator checklist.
 
+Routine edits need no independent evaluator. For substantial changes, inspect
+the diff and existing evidence; rerun only suspect or unverified paths. Do not
+expand to services, browsers, builds, or full suites without a specific reason.
+
 ## Checks
 
 - Does the diff solve the stated task without extra scope?

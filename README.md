@@ -1,329 +1,127 @@
-# Agent Harness Reference
+# Agent Harness
 
-This repository is a portable reference harness for multi-person projects that
-use Codex and Claude Code. It gives agents a small, shared project entrypoint,
-keeps durable knowledge in structured docs, and moves mandatory behavior into
-scripts, hooks, rules, and CI-ready checks.
+Install and maintain a shared repository harness for Codex, Claude Code, or both.
+It provides project docs, task workflows, native tool adapters, quality checks,
+and optional durable decision memory. The CLI uses only Node.js built-ins and
+ships its templates in the package; installation fetches no extra templates.
 
-## What This Framework Is
+## Install and Maintain
 
-The harness is not a prompt library. It is a project operating system for AI
-coding agents:
-
-- `AGENTS.md` is the shared, short agent entrypoint.
-- `CLAUDE.md` adapts the shared entrypoint for Claude Code.
-- `docs/` is the durable source of truth for product, architecture, quality,
-  security, performance, and operations.
-- `docs/agent/` stores reusable workflows, evaluations, decisions, active
-  plans, and completed plans.
-- `BRAIN.md` and `brain/` store durable decisions, rationale, constraints, and
-  reversals that future agents should not rediscover.
-- `.agents/skills/` exposes reusable workflows to Codex.
-- `.claude/skills/`, `.claude/rules/`, and `.claude/agents/` expose the same
-  concepts through Claude Code's native mechanisms.
-- `.codex/` contains Codex project configuration, hooks, and command rules.
-- `scripts/agent/` contains executable checks that can run locally, in hooks,
-  and in CI.
-
-The design follows one rule: markdown provides context, but enforcement belongs
-in executable checks.
-
-## Quick Start
-
-Agent Harness requires Node.js 20 or newer and must run inside a Git repository.
-Initialize the current project from the stable `main` branch:
+Run inside a Git repository with Node.js 20 or newer. Use Node 22 or 24 LTS for
+maintained environments; Node 20 remains a legacy compatibility target.
 
 ```sh
 npx --yes github:ivershuo/harness init
-```
-
-The CLI detects the project stack and existing CI, recommends modules, and
-shows every planned action before writing. Codex and Claude Code support plus
-the project brain are enabled by default.
-
-Validate an installed harness:
-
-```sh
 npx --yes github:ivershuo/harness doctor
-```
-
-Apply framework updates from `main`:
-
-```sh
 npx --yes github:ivershuo/harness update
 ```
 
-For reproducible setup or rollback, pin a release tag:
+`init` detects the stack and CI, then displays a plan before writing. Defaults
+include both tools and brain; UI/API modules are recommended when detected.
+`update` requires a clean worktree unless you supply `--allow-dirty`.
+Use `--dry-run` to inspect changes and `--yes` for non-interactive application.
+For reproducible setup or rollback, pin an existing release, for example
+`github:ivershuo/harness#v0.1.1`.
+
+## Start Small
+
+Install only the tool and modules the project needs. A minimal Codex setup is:
 
 ```sh
-npx --yes github:ivershuo/harness#v0.1.0 init
+npx --yes github:ivershuo/harness init --tools codex --modules none --ci none
 ```
 
-Use `--dry-run` to inspect an init or update without writing. Automated runs
-must pass `--yes`; updates require a clean worktree unless `--allow-dirty` is
-explicitly supplied.
+Catalog target counts, excluding `.agent-harness/manifest.json` and optional CI:
 
-## Installed File Ownership
+| Tools | Optional modules | Targets |
+| --- | --- | ---: |
+| Codex | none | 31 |
+| Claude Code | none | 41 |
+| Both | none | 49 |
+| Both | brain | 61 |
 
-The CLI records installed state in the committed
-`.agent-harness/manifest.json` file:
+GitHub CI adds one target. UI/API modules add their evaluation and selected tool
+rules. Native skills and role files have separate paths because the tools discover
+them there; their procedures live in shared workflows rather than duplicate text.
 
-- `seed`: project facts such as product and architecture docs. Once created,
-  the framework never overwrites them. Existing seed files that lack required
-  Harness links or headings receive a content-preserving adaptation proposal.
-- `managed`: shared workflows, skills, evaluations, and checks. Updates replace
-  them only while their recorded hash still matches.
-- `merged`: shared settings such as `.gitignore`, `CLAUDE.md`, and JSON tool
-  configuration. Only managed blocks or missing structured values are added.
+Selections are additive: later init/update can add tools or modules, but passing
+`--modules none` does not uninstall previous selections. The CLI does not remove
+installed files. Do not delete required tracked skills to reduce an existing
+installation; checker and doctor report those as missing.
 
-When a managed file was changed, the CLI writes a proposed replacement under
-`.agent-harness/proposals/<version>/`. Merge conflicts produce a `.merge.md`
-report instead of a replacement file. In both cases the project file is
-preserved; resolve the proposal deliberately, then run `doctor` again.
+## Ownership and Safe Updates
 
-Text hashes normalize LF and CRLF line endings, so normal Windows checkouts do
-not appear as local modifications. JSON arrays identify Harness-owned check
-commands and hooks so later versions can replace them without duplicating user
-configuration.
+Commit `.agent-harness/manifest.json` with the shared harness files. The manifest
+records selection, template versions, hashes, ownership, and pending proposals:
 
-## Why This Exists
+- **Seed:** project facts such as product, architecture, and brain docs. Existing
+  content stays project-owned; required adaptations become proposals.
+- **Managed:** workflows, skills, evaluations, and scripts. Update replaces them
+  only when their recorded content still matches; custom edits become proposals.
+- **Merged:** shared settings. The CLI reconciles managed blocks or JSON defaults
+  while preserving custom hooks, matcher groups, and handler options.
 
-Agent-written code fails in predictable ways when project knowledge is scattered
-across chats, PR comments, private memories, and stale docs. This harness makes
-the important parts explicit:
+Review proposals under `.agent-harness/proposals/<version>/`, resolve deliberately,
+then rerun `doctor`. Plans stop when inspected content changes. Writers use an
+exclusive lock and preserve existing POSIX mode and owner/group. See
+[security guarantees and limits](docs/SECURITY.md) and
+[lock recovery](docs/OPERATIONS.md).
 
-- where agents should look for facts;
-- how they should plan non-trivial work;
-- what must be verified before work is accepted;
-- which risks reviewers should prioritize;
-- when repeated corrections should become automation.
+The CLI merges local agent state and report ignores into `.gitignore`; retain
+project-specific dependency, environment, and secret patterns. The committed
+harness files and manifest are shared state, not local scratch files.
 
-It also keeps startup context intentionally small. Large `AGENTS.md` or
-`CLAUDE.md` files can make agents slower, more expensive, and less reliable.
-Put only high-frequency, non-obvious, correctness-affecting rules in startup
-files.
+## Hooks and Checks
 
-## Repository Layout
+Both tool adapters invoke the installed `scripts/agent/stop-hook.mjs`. It locates
+the Git root, checks instruction hygiene, emits JSON, and requests at most one
+repair continuation. Missing scripts or invalid event input produce a warning
+and require manual checks. Full quality gates still run in CI.
 
-```text
-AGENTS.md
-CLAUDE.md
-docs/
-  ARCHITECTURE.md
-  PRODUCT.md
-  QUALITY.md
-  SECURITY.md
-  PERFORMANCE.md
-  OPERATIONS.md
-  agent/
-BRAIN.md
-brain/
-.agents/skills/
-.codex/
-.claude/
-.mcp.json
-scripts/agent/
-```
+In Codex, review and trust changed definitions with `/hooks`. Installation and
+`doctor` success do not establish runtime hook trust. Protocol references:
+[Codex Hooks](https://learn.chatgpt.com/docs/hooks) and
+[Claude Code Hooks](https://code.claude.com/docs/en/hooks).
 
-## How To Use This In A Real Project
-
-Use the CLI for installation and upgrades, then adapt project-owned files to the
-repository. Manual copying remains possible but does not provide ownership,
-drift detection, or safe updates.
-
-1. Start with `AGENTS.md` and `CLAUDE.md`.
-   Keep `AGENTS.md` under 150 lines. Remove anything that is generic, obvious,
-   or already enforced by tools. Keep `CLAUDE.md` as a thin adapter that imports
-   `AGENTS.md`.
-
-2. Fill the docs with project truth.
-   Put product behavior in `docs/PRODUCT.md`, dependency boundaries in
-   `docs/ARCHITECTURE.md`, security requirements in `docs/SECURITY.md`, and
-   performance budgets in `docs/PERFORMANCE.md`.
-
-3. Seed the project brain deliberately.
-   Use `BRAIN.md` and `brain/` for decision-grade knowledge: durable decisions,
-   rejected alternatives, rationale, reversals, and constraints. Do not store raw
-   transcripts or temporary task notes there.
-
-4. Map existing commands into `scripts/agent/`.
-   The included checks validate the harness itself. Add wrappers for your real
-   lint, typecheck, unit test, integration test, Playwright, security, and API
-   contract checks.
-
-5. Add only useful skills.
-   Keep the provided workflow skills if they match your team. Delete unused
-   ones. Add project-specific skills only for workflows that happen repeatedly.
-
-6. Add path-scoped Claude rules.
-   Use `.claude/rules/` for frontend, API, database, infra, or package-specific
-   rules. Keep broad rules out of startup context when they only apply to one
-   part of the repo.
-
-7. Connect external systems through MCP.
-   Add MCP servers only when agents need live access to GitHub, issue trackers,
-   Figma, browser automation, docs, observability, or databases. Start small.
-
-8. Put hard requirements in CI.
-   Hooks help local runs, but CI is the real shared gate. Run the `scripts/agent`
-   checks in CI alongside project-native checks.
-
-9. Maintain the harness like code.
-   When an agent repeats a mistake twice, update a doc, skill, script, hook, or
-   CI check. When rules become stale, delete them.
-
-## Recommended Ignore Rules
-
-Projects adopting this harness should commit shared rules, docs, skills, and
-checks, but ignore local overrides, secrets, sessions, scratch space, and
-generated reports.
-
-Add these entries to the target project's `.gitignore` and merge them with its
-language-specific ignores:
-
-```gitignore
-# Local agent/session state
-AGENTS.override.md
-CLAUDE.local.md
-.agent-harness/proposals/
-.agent-harness/cache/
-.codex-log/
-.codex/sessions/
-.codex/tmp/
-.claude/local/
-.claude/sessions/
-.claude/tmp/
-docs/agent/scratch/
-brain/scratch/
-
-# Secrets and local environment
-.env
-.env.*
-!.env.example
-*.pem
-*.key
-*.p12
-*.pfx
-secrets/
-
-# Local MCP or brain preferences
-.mcp.local.json
-.mindmux/preferences.json
-
-# Test and browser reports
-coverage/
-test-results/
-playwright-report/
-reports/
-logs/
-*.log
-```
-
-Do not ignore these by default, because they are the shared harness:
-
-```text
-AGENTS.md
-CLAUDE.md
-BRAIN.md
-brain/
-docs/agent/
-.agents/skills/
-.claude/rules/
-.claude/skills/
-.claude/agents/
-.claude/settings.json
-.codex/config.toml
-.codex/hooks.json
-.codex/rules/
-scripts/agent/
-.mcp.json
-.agent-harness/manifest.json
-```
-
-## Lightweight Project Brain
-
-This template includes a small, local version of the idea from
-[`projectbrain.md`](https://projectbrain.md/). The goal is to keep persistent
-project memory in plain Markdown without requiring an external runtime.
-
-Use the brain when a conclusion should survive across sessions:
-
-- why a technical direction was chosen;
-- which alternatives were rejected;
-- which constraints shape future work;
-- what reversed and why;
-- what future agents should know before planning related work.
-
-Each page under `brain/pages/` has two parts:
-
-- `compiled_truth`: the current authoritative understanding;
-- `timeline`: append-only decisions, evidence, reversals, and notes.
-
-This is intentionally lighter than the full external `brain.md` CLI. It gives us
-the convention and checks now; teams that need atomic writes, a richer CLI, or
-installable skills can adopt the external project later.
-
-## Adoption Paths Beyond Copying Files
-
-The CLI is the primary adoption path for new and existing repositories. Teams
-can layer additional distribution mechanisms on top:
-
-- Create an internal template repository for new projects.
-- Package reusable Codex and Claude skills as native marketplace plugins.
-- Add a CI check that compares each repo's harness against a versioned baseline.
-- Use a periodic "doc gardener" task to detect stale commands, oversized
-  startup files, missing security/performance docs, and unused skills.
-
-For mature organizations, use a layered model:
-
-- organization baseline: security, privacy, compliance, review policy;
-- project harness: product, architecture, commands, local workflows;
-- local overrides: personal preferences and machine-specific setup only.
-
-## Can This Force Agents To Obey?
-
-No markdown file can guarantee full compliance. `AGENTS.md`, `CLAUDE.md`, rules,
-and skills are context. Agents usually follow them, but they are not a security
-boundary and not a proof of correctness.
-
-Use this model instead:
-
-- **Guidance:** `AGENTS.md`, `CLAUDE.md`, docs, rules, and skills tell agents
-  what good work looks like.
-- **Friction:** permissions, sandboxing, allowlists, and hooks make risky
-  actions harder.
-- **Enforcement:** scripts, tests, type checks, linters, security scans, and CI
-  decide whether work can land.
-- **Independent evaluation:** reviewer/evaluator agents or humans inspect work
-  from a fresh context.
-- **Auditability:** plans, completed plans, PRs, logs, and decision records make
-  the process inspectable.
-
-The practical goal is not perfect obedience. The goal is to make the correct
-path the easiest path, make dangerous actions visible, and make unacceptable
-output fail automatically.
-
-## Included Checks
-
-Run these from the repository root:
+Run the generated gate in the target repository:
 
 ```sh
 node scripts/agent/check.mjs
 ```
 
 Use `--only instructions`, `docs`, `architecture`, `brain`, or `templates` for a
-focused check. The generated checker is cross-platform and has no network or
-package dependencies.
+focused scope. Keep its managed `manifest-schema.mjs` and `stop-hook.mjs` siblings.
+The checker validates harness structure and requirements; add project-native
+lint, typecheck, tests, security, and browser gates alongside it.
 
-## Maintenance Checklist
+Repository CI/release gates are:
 
-Review this harness periodically:
+```sh
+npm test
+npm run check
+npm run verify:package
+```
 
-- Is `AGENTS.md` still under 150 lines?
-- Are stale commands removed?
-- Are security and performance requirements explicit?
-- Are repeated review comments now automated?
-- Are durable decisions captured in `brain/` instead of buried in chat?
-- Are unused skills, rules, and subagents removed?
-- Do CI checks enforce the rules that matter most?
-- Do agents have a reliable evaluator path for non-trivial work?
+Local edits use the smallest useful check, not this entire list. Small changes
+do not trigger service/browser startup, full builds, or extra reviewers by
+default; stop after sufficient evidence. See [local verification limits](docs/QUALITY.md).
+
+## Where Content Belongs
+
+- `AGENTS.md`: short operational entrypoint; `CLAUDE.md` imports it.
+- `DESIGN.md`, when present at the root: read before design/UI work and follow
+  as the project's design rules. The harness does not create or require it.
+- [Product](docs/PRODUCT.md), [architecture](docs/ARCHITECTURE.md),
+  [quality](docs/QUALITY.md), [security](docs/SECURITY.md),
+  [performance](docs/PERFORMANCE.md), and [operations](docs/OPERATIONS.md):
+  project facts and contracts.
+- [Agent workflows and plans](docs/agent/index.md): repeatable procedures and
+  verification records; native skill files point to these workflows.
+- [Brain protocol](BRAIN.md) and [brain index](brain/index.md): decisions,
+  alternatives, reversals, and rationale that code cannot explain. Temporary
+  notes and implementation tours belong elsewhere.
+
+Fill project-owned docs with actual project knowledge after installation.
+Promote repeated corrections into focused docs, scripts, or CI, and remove stale
+rules. Markdown supplies context; executable gates and independent evaluation
+provide verification. This harness does not replace project-native tests.

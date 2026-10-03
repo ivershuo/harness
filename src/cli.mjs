@@ -105,7 +105,7 @@ async function runMutation(parsed) {
   if (!parsed.dryRun && (parsed.command === "update" || previous) && !parsed.allowDirty && isGitDirty(root)) {
     throw new Error("reconciliation requires a clean Git worktree; commit changes or use --allow-dirty");
   }
-  const detected = detectProject(root);
+  const detected = await detectProject(root);
   const selection = normalizeSelection(parsed, detected, previous?.selection ?? null);
   const plan = await planHarness({
     root,

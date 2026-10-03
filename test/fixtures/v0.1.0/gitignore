@@ -1,0 +1,22 @@
+# Local agent/session state
+AGENTS.override.md
+CLAUDE.local.md
+.agent-harness/proposals/
+.agent-harness/cache/
+.codex-log/
+.codex/sessions/
+.codex/tmp/
+.claude/local/
+.claude/sessions/
+.claude/tmp/
+docs/agent/scratch/
+brain/scratch/
+
+# Local MCP and brain preferences
+.mcp.local.json
+.mindmux/preferences.json
+
+# Generated agent reports
+reports/
+test-results/
+playwright-report/

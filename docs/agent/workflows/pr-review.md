@@ -18,3 +18,7 @@ Use this for human or agent reviews.
 - Avoid broad style feedback unless it blocks maintainability or violates a
   documented rule.
 - If there are no issues, say so and list residual test gaps.
+- Reuse existing passing evidence for unchanged code. Rerun only a suspect or
+  unverified path; do not launch full suites, servers, or browsers by default.
+- Routine edits do not require an independent reviewer. For substantial changes,
+  prefer one final reviewer over separate testing/security/UI agents.
