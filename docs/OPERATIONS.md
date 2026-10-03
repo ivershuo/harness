@@ -44,7 +44,7 @@ Missing adapter files or invalid/oversized event input produce a non-blocking
 warning. Run the instruction check and doctor manually to diagnose these errors;
 the normal checks still reject missing adapter files.
 
-## Maintenance 0.1.2 — Unreleased
+## Maintenance 0.1.2 — 2026-10-03
 
 - Preserve LF/CRLF when adding Claude skill invocation metadata.
 - Make source and packed-runtime assertions line-ending aware, retaining exact

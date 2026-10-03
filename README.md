@@ -21,7 +21,7 @@ include both tools and brain; UI/API modules are recommended when detected.
 `update` requires a clean worktree unless you supply `--allow-dirty`.
 Use `--dry-run` to inspect changes and `--yes` for non-interactive application.
 For reproducible setup or rollback, pin an existing release, for example
-`github:ivershuo/harness#v0.1.1`.
+`github:ivershuo/harness#v0.1.2`.
 
 ## Start Small
 
