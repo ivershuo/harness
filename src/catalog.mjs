@@ -40,7 +40,7 @@ export function adaptTemplate(content, adapter) {
   if (fields.length !== 2 || new Set(fields).size !== 2 || fields.includes(undefined)) {
     throw new Error("skill frontmatter must contain only flat name and description fields");
   }
-  return content.replace(/^---\r?\n/, "$&disable-model-invocation: true\n");
+  return content.replace(/^---(\r?\n)/, "---$1disable-model-invocation: true$1");
 }
 
 export function selectEntries(catalog, selection) {

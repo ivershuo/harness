@@ -15,8 +15,15 @@ test("Claude skill rendering shares the canonical body and preserves manual invo
   const source = ".agents/skills/feature-plan/SKILL.md";
   const canonical = await readFile(path.join(packageRoot, source), "utf8");
   const rendered = await renderEntry({ source, adapter: "claude-skill" }, {});
-  assert.match(rendered, /^---\ndisable-model-invocation: true\n/);
-  assert.equal(rendered.replace("disable-model-invocation: true\n", ""), canonical);
+  assert.match(rendered, /^---\r?\ndisable-model-invocation: true\r?\n/);
+  assert.equal(rendered.replace(/^disable-model-invocation: true\r?\n/m, ""), canonical);
+  for (const newline of ["\n", "\r\n"]) {
+    const input = canonical.replace(/\r?\n/g, newline);
+    assert.equal(
+      adaptTemplate(input, "claude-skill"),
+      input.replace(/^---\r?\n/, `---${newline}disable-model-invocation: true${newline}`),
+    );
+  }
 });
 
 test("catalog rendering rejects unknown adapters and unsafe skill metadata", async () => {

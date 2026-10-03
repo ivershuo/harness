@@ -35,8 +35,8 @@ test("packed tarball runs init, generated checks, doctor and nested Stop hooks",
       await assert.rejects(readFile(path.join(output, "package", target)), { code: "ENOENT" });
       const canonical = await readFile(path.join(output, "package", target.replace(".claude/", ".agents/")), "utf8");
       const content = await readFile(path.join(root, target), "utf8");
-      assert.match(content, /^---\ndisable-model-invocation: true\n/);
-      assert.equal(content.replace("disable-model-invocation: true\n", ""), canonical);
+      assert.match(content, /^---\r?\ndisable-model-invocation: true\r?\n/);
+      assert.equal(content.replace(/^disable-model-invocation: true\r?\n/m, ""), canonical);
     }
     const repeated = run(process.execPath, [...initArgs, "--allow-dirty"], root);
     assert.equal(repeated.status, 0, repeated.stderr);

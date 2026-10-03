@@ -19,6 +19,7 @@ not install Codex or Claude Code and does not fetch templates at runtime.
   Skill procedures are sourced from `.agents/skills/`; the Claude catalog adapter
   adds manual-invocation metadata without changing the shared body. Native
   repository wrappers remain available for local tool discovery.
+  Inserted metadata preserves the source skill's LF or CRLF line endings.
   Canonical skill frontmatter is limited to flat `name` and `description` fields;
   unknown fields, quoted keys, duplicate keys, and multiline YAML are rejected.
 - Keep merged templates separate from their target files: using a managed block
